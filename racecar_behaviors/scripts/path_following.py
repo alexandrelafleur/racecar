@@ -73,6 +73,7 @@ class PathFollowing:
     def blob_callback(self, msg):
         # print('Distance' , msg.linear.x)
         # print('Angle', msg.angular.z)
+        print("got blob callback")
         self.angle_blob = msg.angular.z
         if(not self.dont_look_for_objects_no_more):
             if (msg.linear.x) < 2.0:

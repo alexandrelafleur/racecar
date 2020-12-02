@@ -138,6 +138,7 @@ class BlobDetector:
 
         # We process only the closest object detected
         if closestObject[2] > 0:
+            print("FOND the oject")
             # assuming the object is circular, use center of the object as position
             transObj = (closestObject[0], closestObject[1], closestObject[2])
             rotObj = tf.transformations.quaternion_from_euler(0, np.pi/2, -np.pi/2)
@@ -173,7 +174,8 @@ class BlobDetector:
             msg.angular.z = angle
             self.object_pub.publish(msg) # signal that an object has been detected
             #rospy.loginfo("Object detected at [%f,%f] in %s frame! Distance and direction from robot: %fm %fdeg.", transMap[0], transMap[1], self.map_frame_id, distance, angle*180.0/np.pi)
-        # else:
+        else:
+            print("didnot found th eobject")
         #     rospy.loginfo("Object not detected")
         #     print("Object not detected")
         #     msg = String()
