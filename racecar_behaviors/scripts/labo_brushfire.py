@@ -17,7 +17,7 @@ def main():
         print "Service call failed: %s"%e
         return
     
-    rospy.loginfo("Got map=%dx%d resolution=%f", response.map.info.height, response.map.info.width, response.map.info.resolution)    
+    # rospy.loginfo("Got map=%dx%d resolution=%f", response.map.info.height, response.map.info.width, response.map.info.resolution)    
     grid = np.reshape(response.map.data, [response.map.info.height, response.map.info.width])
     
     brushfireMap = brushfire(grid)
@@ -31,9 +31,9 @@ def main():
         brushfireMap[mask] = 0
         # Flip image to get x->up, y->left (like top view in RVIZ looking towards x-axis)
         cv2.imwrite('brushfire.bmp', cv2.transpose(cv2.flip(brushfireMap, -1)))
-        rospy.loginfo("Exported brushfire.bmp")
+        # rospy.loginfo("Exported brushfire.bmp")
     else:
-        rospy.loginfo("brushfire failed! Is brusfire implemented?")
+        # rospy.loginfo("brushfire failed! Is brusfire implemented?")
     
     # Example to show grid with same color than RVIZ
     grid[grid == -1] = 89
@@ -41,7 +41,7 @@ def main():
     grid[grid == 100] = 0
     # Flip image to get x->up, y->left (like top view in RVIZ looking towards x-axis)
     cv2.imwrite('map.bmp', cv2.transpose(cv2.flip(grid, -1))) 
-    rospy.loginfo("Exported map.bmp")
+    # rospy.loginfo("Exported map.bmp")
 
 if __name__ == '__main__':
     main()

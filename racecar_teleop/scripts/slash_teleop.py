@@ -29,7 +29,7 @@ class teleop(object):
         min_axes = 5 if self.ps4 else 4
         if len(joy_msg.axes) < min_axes or len(joy_msg.buttons) < 7:
             if not self.joystickCompatibilityWarned:
-                rospy.logwarn("slash_teleop: Received \"%s\" topic doesn't have enough axes (has %d, min=%d) and/ro buttons (has %d, min=7). If a Logitech gamepad is used, make sure also it is in D mode. This warning is only shown once. Until then, this node won't publish any \"%s\".", rospy.names.resolve_name("joy"), len(joy_msg.axes), min_axes, len(joy_msg.buttons), rospy.names.resolve_name("ctl_ref"))
+                # rospy.logwarn("slash_teleop: Received \"%s\" topic doesn't have enough axes (has %d, min=%d) and/ro buttons (has %d, min=7). If a Logitech gamepad is used, make sure also it is in D mode. This warning is only shown once. Until then, this node won't publish any \"%s\".", rospy.names.resolve_name("joy"), len(joy_msg.axes), min_axes, len(joy_msg.buttons), rospy.names.resolve_name("ctl_ref"))
                 self.joystickCompatibilityWarned = True
             return
 

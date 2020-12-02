@@ -58,7 +58,7 @@ if __name__ == '__main__':
     rospy.Subscriber('cmd_vel', Twist, cmd_callback, queue_size=1)
     pub = rospy.Publisher('ackermann_cmd', AckermannDriveStamped, queue_size=1)
     
-    rospy.loginfo("Node 'cmd_vel_to_ackermann_drive' started.\nFrame id: %s, wheelbase: %f", frame_id, wheelbase)
+    # rospy.loginfo("Node 'cmd_vel_to_ackermann_drive' started.\nFrame id: %s, wheelbase: %f", frame_id, wheelbase)
     
     rospy.spin()
     

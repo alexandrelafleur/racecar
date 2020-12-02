@@ -76,7 +76,7 @@ class BlobDetector:
         self.file.close()
         
     def config_callback(self, config, level):
-        rospy.loginfo("""Reconfigure Request: {color_hue}, {color_saturation}, {color_value}, {color_range}, {border}""".format(**config))
+        # rospy.loginfo("""Reconfigure Request: {color_hue}, {color_saturation}, {color_value}, {color_range}, {border}""".format(**config))
         self.color_hue = config.color_hue
         self.color_range = config.color_range
         self.color_saturation = config.color_saturation

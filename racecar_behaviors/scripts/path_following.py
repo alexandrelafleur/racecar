@@ -17,6 +17,7 @@ class State:
 
 class PathFollowing:
     def __init__(self):
+        print("path_following_init")
         self.twist = Twist()
         self.max_speed = rospy.get_param('~max_speed', 0.25)
         self.max_steering = rospy.get_param('~max_steering', 0.37)
@@ -24,6 +25,8 @@ class PathFollowing:
         self.scan_sub = rospy.Subscriber('scan', LaserScan, self.scan_callback, queue_size=1)
         self.odom_sub = rospy.Subscriber('odom', Odometry, self.odom_callback, queue_size=1)
         self.obstacle_sub = rospy.Subscriber('obstacle_detected', Bool, self.obstacle_callback, queue_size=1)
+        self.state_timer = rospy.Timer( rospy.Duration( 0.05 ), self.state_machine_cb )
+
         self.goal_pos_x = 13.5
         self.end_pos_x = 0
         self.goal_pos_y = 2.1
@@ -34,26 +37,9 @@ class PathFollowing:
         self.state = State.FOLLOW_PATH #
         self.obstacle_detected = False
 
-    def scan_callback(self, msg):
-        # Because the lidar is oriented backward on the racecar, 
-        # if we want the middle value of the ranges to be forward:
-        l2 = len(msg.ranges)/2;
-        ranges = msg.ranges[l2:len(msg.ranges)] + msg.ranges[0:l2]
-        
-        # Obstacle front?   l2+l2/8
-        R_obstacleDetected = False
-        L_obstacleDetected = False
-        for i in range(3*l2/4 - l2/16, 3*l2/4 + l2/16) :
-            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
-                R_obstacleDetected = True
-                #print("obst detected right")
-                break
-        for i in range(5*l2/4 - l2/16, 5*l2/4 + l2/16) :
-            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
-                L_obstacleDetected = True
-                #print("obst detected left")
-                break
 
+    def state_machine_cb:
+        prin("yo")
         if self.state == State.CENTER_ON_OBJECT:
             self.twist.linear.x = 0.2
             self.twist.angular.z = self.angle_blob
@@ -66,9 +52,9 @@ class PathFollowing:
             # self.dont_look_for_objects_no_more = True
 
         elif self.state == State.FOLLOW_PATH:
-            if(R_obstacleDetected and not L_obstacleDetected):
+            if(self.R_obstacleDetected and not self.L_obstacleDetected):
                 self.twist.angular.z = self.max_steering
-            elif(L_obstacleDetected and not R_obstacleDetected):
+            elif(self.L_obstacleDetected and not self.R_obstacleDetected):
                 self.twist.angular.z = -(self.max_steering)
             else:
                 self.twist.angular.z = 0
@@ -89,6 +75,30 @@ class PathFollowing:
                 self.state = State.FOLLOW_PATH
 
         self.cmd_vel_pub.publish(self.twist)
+
+
+    def scan_callback(self, msg):
+        print("scan_callback")
+        # Because the lidar is oriented backward on the racecar, 
+        # if we want the middle value of the ranges to be forward:
+        l2 = len(msg.ranges)/2
+        ranges = msg.ranges[l2:len(msg.ranges)] + msg.ranges[0:l2]
+        
+        # Obstacle front?   l2+l2/8
+        self.R_obstacleDetected = False
+        self.L_obstacleDetected = False
+        for i in range(3*l2/4 - l2/16, 3*l2/4 + l2/16) :
+            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
+                self.R_obstacleDetected = True
+                #print("obst detected right")
+                break
+        for i in range(5*l2/4 - l2/16, 5*l2/4 + l2/16) :
+            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
+                self.L_obstacleDetected = True
+                #print("obst detected left")
+                break
+
+        
         
     def odom_callback(self, msg):
         self.pos_x = msg.pose.pose.position.x
