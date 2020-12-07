@@ -5,10 +5,18 @@ import cv2
 import numpy as np
 from nav_msgs.srv import GetMap
 from libbehaviors import occupancy_grid_to_maze, brushfire
-from astar import astar
+from astar import pfind_new
 
+def meter_to_cells((x_m, y_m)):
+    resolution = 0.1
+    corner_x = -8.98
+    corner_y = -3.68
 
-def main():
+    x_cell = int((y_m- corner_y) / resolution) 
+    y_cell = int((x_m - corner_x) / resolution)
+    return x_cell, y_cell
+
+def get_grid():
     rospy.init_node('brushfire')
     prefix = "racecar"
     rospy.wait_for_service(prefix + '/get_map')
@@ -21,74 +29,40 @@ def main():
 
     rospy.loginfo("Got map=%dx%d resolution=%f", response.map.info.height,
                   response.map.info.width, response.map.info.resolution)
-    start = (100, 50)
-    end = (101, 50)
     
     grid = np.reshape(response.map.data, [
                       response.map.info.height, response.map.info.width])
+    return grid
+
+def get_path(x, y, id):
+    grid = get_grid()
     maze = occupancy_grid_to_maze(grid)
     maze_list = maze.tolist()
-    brushfireMap = brushfire(maze)
-    # path = astar(maze.tolist(), start, end)
+    brushfire_map = brushfire(maze)
 
-    itty_bitty_maze = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, -1, -1, -1, 0, 0, 0, 0, 0],
-            [-1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, -1, -1, -1, 0],
-            [0, 0, 0, 0, 0, 0, 0, -1, -1, -1],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, -1, -1, -1, 0, 0, 0, 0, 0, 0],
-            [-1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
-    small_maze = maze_list[100:102]
-    #print(maze_list)
-    path = astar(small_maze, (0,61), (0,88))
+    start_cells = meter_to_cells((0,0))
+    end_cells = meter_to_cells((x,y))
+    path = pfind_new(maze_list, start_cells, end_cells, brushfire_map)
 
-    # for i, row in enumerate(small_maze):
-    #     for j,cell in enumerate(row):
-    #         if cell == 0:
-    #             print(i,j)
+    print("start cells", start_cells)
+    print("end cells", end_cells)
 
-    # print("grid")
-    # print (grid)
-
-    # print("maze")
-    # print (maze)
-
-    # # print("maze.tolist()")
-    # # print (maze.tolist())
-
-    # print("brushfireMap")
-    # print (brushfireMap)
+    print("start value is:", maze_list[start_cells[0]][start_cells[1]])
+    print("end value is:", maze_list[end_cells[0]][end_cells[1]])
 
     print("path")
     print(path)
 
- 
-
- 
-
-    
-    mazeNp = np.array(maze)
-
-    # for i in range(0, len(path)):
-    #     curr_space = path[i]
-    #     mazeNp[curr_space[0], curr_space[1]] = i+1
-    # print(mazeNp)
-
-
-
     # Export brusfire map for visualization
     # Adjust color: 0 (black) = obstacle, 10-255 (white) = safest cells
-    maximum = np.amax(brushfireMap)
+    maximum = np.amax(brushfire_map)
     if maximum > 1:
-        mask = brushfireMap == 1
-        brushfireMap = brushfireMap.astype(
+        mask = brushfire_map == 1
+        brushfire_map = brushfire_map.astype(
             float) / float(maximum) * 225.0 + 30.0
-        brushfireMap[mask] = 0
+        brushfire_map[mask] = 0
         # Flip image to get x->up, y->left (like top view in RVIZ looking towards x-axis)
-        cv2.imwrite('brushfire.bmp', cv2.transpose(cv2.flip(brushfireMap, -1)))
+        cv2.imwrite('brushfire.bmp', cv2.transpose(cv2.flip(brushfire_map, -1)))
         rospy.loginfo("Exported brushfire.bmp")
     else:
         rospy.loginfo("brushfire failed! Is brusfire implemented?")
@@ -102,26 +76,27 @@ def main():
     rospy.loginfo("Exported map.bmp")
 
     # Example to show grid with same color than RVIZ
-    maze[maze == -1] = 120
-    maze[maze == 0] = 80
+    maze = np.array(maze_list)
+    maze[maze == -1] = 80
+    maze[maze == 0] = 120
+    maze[start_cells[0]][start_cells[1]] = 0
+    maze[end_cells[0]][end_cells[1]] = 0
+    if path:
+        for i, step in enumerate(path):
+            if i != 0 and i!=len(path)-1:
+                maze[step[0]][step[1]] = 255
 
-    print("color",maze[110][50])
-    #maze[maze == 100] = 0
     cv2.imwrite('maze.bmp', cv2.transpose(cv2.flip(maze, -1)))
     rospy.loginfo("Exported maze.bmp")
 
-        # Example to show grid with same color than RVIZ
-    itty_bitty_maze = np.array(itty_bitty_maze)
-    itty_bitty_maze[itty_bitty_maze == -1] = 120
-    itty_bitty_maze[itty_bitty_maze == 0] = 80
-    cv2.imwrite('itty_bitty_maze.bmp', cv2.transpose(cv2.flip(itty_bitty_maze, -1)))
-    rospy.loginfo("Exported itty_bitty_maze.bmp")
 
-    small_maze = np.array(small_maze)
-    small_maze[small_maze == -1] = 120
-    small_maze[small_maze == 0] = 80
-    cv2.imwrite('small_maze.bmp', cv2.transpose(cv2.flip(small_maze, -1)))
-    rospy.loginfo("Exported small_maze.bmp")
+
+def main():
+    x = 8.4
+    y = 2.1
+    id = 0
+    get_path(x, y, id)
+
 
 if __name__ == '__main__':
     main()

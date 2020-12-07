@@ -1,209 +1,138 @@
-#!/usr/bin/env python
+from heapq import heappush, heappop
+from math import hypot, sqrt
 
 
-import numpy as np
+SQRT2 = sqrt(2.0)
 
 
-class Node():
-    """A node class for A* Pathfinding"""
+DIRECTIONS = ((1, 0, 1.0), (0, 1, 1.0), (-1, 0, 1.0), (0, -1, 1.0),
+              (1, 1, SQRT2), (-1, -1, SQRT2), (1, -1, SQRT2), (-1, 1, SQRT2))
 
-    def __init__(self, parent=None, position=None):
+
+class Node:
+
+    def __init__(self, x, y, cost=float("inf"), h=0, parent=None):
+        self.x = x
+        self.y = y
+        self.cost = cost
+        self.h = h
         self.parent = parent
-        self.position = position
 
-        self.g = 0
-        self.h = 0
-        self.f = 0
+    def update(self, new_parent, new_cost):
+        self.parent = new_parent
+        self.cost = new_cost
+
+    def __repr__(self):
+        return "Node(x={x}, y={y}, cost={cost}, h={h}, parent={parent})".format(**self.__dict__)
+
+    @property
+    def priority(self):
+        return self.cost + self.h
+
+    @property
+    def pos(self):
+        return self.x, self.y
 
     def __eq__(self, other):
-        return self.position == other.position
+        return self.x == other.x and self.y == other.y
+
+    def __lt__(self, other):
+        """This allows Node to be used in the priority queue directly"""
+        return self.priority < other.priority
 
 
-def astar(maze, start, end):
-    """Returns a list of tuples as a path from the given start to the given end in the given maze"""
-    # Allow diagonal movement
-    print("Astar starting...")
-    allow_diagonal_movement = 1
+def make_grid(n_rows, n_cols, value):
+    """Make a n_rows x n_cols grid filled with an initial value"""
+    return [[value for _ in range(n_cols)] for _ in range(n_rows)]
 
-    # Create start and end node
-    start_node = Node(None, start)
-    start_node.g = start_node.h = start_node.f = 0
-    end_node = Node(None, end)
-    end_node.g = end_node.h = end_node.f = 0
 
-    # Initialize both open and closed list
-    open_list = []
-    closed_list = []
+def euclidean_distance(node1, node2):
+    """Compute the Euclidean/L2 distance between two nodes"""
+    return hypot(node1[0] - node2[0], node1[1] - node2[1])
 
-    # Add the start node
-    open_list.append(start_node)
 
-    # Loop until you find the end
-    i = 1
-    first_five = 1
-    while len(open_list) > 0:
-        # print(len(open_list))
-        # Get the current node
-        current_node = open_list[0]
-        current_index = 0
-        for index, item in enumerate(open_list):
-            if item.f < current_node.f:
-                current_node = item
-                current_index = index
+def is_valid(x, y, grid, x_max, y_max):
+    """Check the bounds and free space in the map"""
+    if 0 <= x < x_max and 0 <= y < y_max:
+        return grid[x][y] == 0
+    return False
 
-        # Pop current off open list, add to closed list
-        open_list.pop(current_index)
-        closed_list.append(current_node)
 
-        # Found the goal
-        if current_node == end_node:
-            path = []
-            current = current_node
-            while current is not None:
-                path.append(current.position)
-                current = current.parent
-                print("hello")
-                print(path)
-            return path[::-1]  # Return reversed path
+def pfind_new(grid, start, goal, brushfire_map):
+    x_max, y_max = len(grid), len(grid[0])
 
-        # Generate children
-        children = []
-        adjacent_squares = ((0, -1), (0, 1), (-1, 0), (1, 0),)
-        if allow_diagonal_movement:
-            adjacent_squares = ((0, -1), (0, 1), (-1, 0),
-                                (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1),)
-        for new_position in adjacent_squares:
+    # None will later be used as sentinel for "no node here (yet)"
+    nodes = make_grid(x_max, y_max, None)
 
-            # Get node position
-            node_position = (
-                current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
+    start_node = Node(*start, cost=0, h=euclidean_distance(start, goal))
+    nodes[start_node.x][start_node.y] = start_node
+    goal_node = Node(*goal)
+    nodes[goal_node.x][goal_node.y] = goal_node
 
-            # Make sure within range
-            if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (len(maze[len(maze)-1]) - 1) or node_position[1] < 0:
+    # openlist will be used a priority queue and has to be accessed using
+    # heappush and heappop from the heapq module. The Node class was modified
+    # to work well with this kind of datastructure.
+    openlist = []
+    heappush(openlist, start_node)
+
+    found = False
+    while not found:
+        # get the node with the least overall cost (actual + heuristic)
+        current = heappop(openlist)
+        for direction in DIRECTIONS:
+            # compute new coordinates
+            x_n, y_n = current.x + direction[0], current.y + direction[1]
+            if not is_valid(x_n, y_n, grid, x_max, y_max):
                 continue
-
-            # Make sure walkable terrain
-            if maze[node_position[0]][node_position[1]] != 0:
-                continue
-
-            # Create new node
-            new_node = Node(current_node, node_position)
-
-            # Append
-            children.append(new_node)
-
-        # Loop through children
-        for child in children:
-
-            # Child is on the closed list
-            broke = 0
-            for closed_child in closed_list:
-                if child == closed_child:
-                    broke = 1
+            # we have valid coordinates
+            if nodes[x_n][y_n] is None:
+                nodes[x_n][y_n] = Node(
+                    x_n, y_n, h=euclidean_distance((x_n, y_n), goal)
+                )
+            # the new cost is made up if the current cost + transition
+            # new_cost = nodes[current.x][current.y].cost + direction[2]
+            new_cost = nodes[current.x][current.y].cost
+            diff = brushfire_map[current.x, current.y] - brushfire_map[x_n, y_n]
+            if diff < (-1):
+                new_cost += 1
+            elif diff == (-1):
+                new_cost += 1
+            elif diff == 0:
+                new_cost += 2
+            elif diff == 1:
+                new_cost += 50
+            else:
+                new_cost += 50
+            
+            if new_cost < nodes[x_n][y_n].cost:
+                # cool, we have found a faster path to this node, let's update
+                # it's predecessor
+                nodes[x_n][y_n].update(current.pos, new_cost)
+                heappush(openlist, nodes[x_n][y_n])
+                if nodes[x_n][y_n] == goal_node:
+                    # we're done, get out of here
+                    found = True
                     break
-            if broke and not first_five:
-                continue
-            # Create the f, g, and h values
-            child.g = current_node.g + \
-                get_cost(maze, current_node.position, end_node.position)
-            child.h = (((child.position[0] - end_node.position[0]) ** 2) + (
-                (child.position[1] - end_node.position[1]) ** 2)) ** (1/2)
-            child.f = child.g + child.h
+        # openlist is empty and we have not bailed out with found. seems like
+        # there is nothing we can do here
+        if not openlist:
+            return []
 
-            # Child is already in the open list
-            broke = 0
-            for open_node in open_list:
-                if child == open_node and child.g > open_node.g:
-                    broke = 1
-                    break
-            if broke and not first_five:
-                continue
-
-            # Add the child to the open list
-            open_list.append(child)
-        i = i+1
-        if i == 6:
-            first_five = 0
-
-
-def brushfire(maze):
-    maze = np.array(maze)
-    mapOfWorld = np.zeros(maze.shape)
-    mapOfWorld[maze == -1] = -1
-    i = -1
-    it = 2
-    first = True
-    # Loop qui change les 0 pour un chiffre si c'est dans le range
-    while 1:
-        rows, cols = np.where(mapOfWorld == i)
-        for j in range(rows.size):
-            if rows[j] + 1 < mapOfWorld.shape[0]:
-                if mapOfWorld[rows[j] + 1, cols[j]] == 0:
-                    mapOfWorld[rows[j] + 1, cols[j]] = i + it
-            if rows[j] - 1 >= 0:
-                if mapOfWorld[rows[j] - 1, cols[j]] == 0:
-                    mapOfWorld[rows[j] - 1, cols[j]] = i + it
-            if cols[j] + 1 < mapOfWorld.shape[1]:
-                if mapOfWorld[rows[j], cols[j] + 1] == 0:
-                    mapOfWorld[rows[j], cols[j] + 1] = i + it
-            if cols[j] - 1 >= 0:
-                if mapOfWorld[rows[j], cols[j] - 1] == 0:
-                    mapOfWorld[rows[j], cols[j] - 1] = i + it
-        # Ajustement des variables
-        if first:
-            i = i + 2
-            it = 1
-            first = False
+    # backtracking
+    path = []
+    current = goal_node
+    # this is a little bit weird because I decided to store only the
+    # coordinates instead of the parent itself. Why? Because repr(node) is way
+    #  more readable that way ;-)
+    while True:
+        path.append(current.pos)
+        if current.parent is not None:
+            current = nodes[current.parent[0]][current.parent[1]]
         else:
-            i = i + 1
-        # Si il y a encore des zeros, continue, sinon arrete
-        zrows, zcols = np.where(mapOfWorld == 0)
-        if zrows.size == 0 & zcols.size == 0:
             break
-    return mapOfWorld
+    # the path is built by backtracking from the goal, so we have to reverse it
+    return path[::-1]
 
 
-def get_cost(maze, currpos, nextpos):
-    bfmap = brushfire(maze)
-    diff = bfmap[currpos[0], currpos[1]]-bfmap[nextpos[0], nextpos[1]]
-    if diff < (-1):
-        cost = 1
-    elif diff == (-1):
-        cost = 10
-    elif diff == 0:
-        cost = 50
-    elif diff == 1:
-        cost = 50
-    else:
-        cost = 50
-    return cost
-
-
-def main():
-
-    maze = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, -1, -1, -1, 0, 0, 0, 0, 0],
-            [-1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, -1, -1, -1, 0],
-            [0, 0, 0, 0, 0, 0, 0, -1, -1, -1],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, -1, -1, -1, 0, 0, 0, 0, 0, 0],
-            [-1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
-
-    start = (9, 4)
-    end = (0, 0)
-
-    path = astar(maze, start, end)
-    mazeNp = np.array(maze)
-    bfmap = brushfire(mazeNp)
-    print(bfmap)
-    for i in range(0, len(path)):
-        curr_space = path[i]
-        mazeNp[curr_space[0], curr_space[1]] = i+1
-    print(mazeNp)
-
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    pass

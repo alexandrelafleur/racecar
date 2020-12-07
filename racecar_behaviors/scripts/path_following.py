@@ -7,6 +7,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String, Bool
 from nav_msgs.msg import Odometry
+from labo_brushfire import get_path
 
 
 class State:
@@ -61,6 +62,7 @@ class PathFollowing:
     def scan_callback(self, msg):
         # Because the lidar is oriented backward on the racecar,
         # if we want the middle value of the ranges to be forward:
+
         l2 = len(msg.ranges)/2
         ranges = msg.ranges[l2:len(msg.ranges)] + msg.ranges[0:l2]
 
