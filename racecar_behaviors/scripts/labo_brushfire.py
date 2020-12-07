@@ -24,7 +24,7 @@ def get_grid():
         get_map = rospy.ServiceProxy(prefix + '/get_map', GetMap)
         response = get_map()
     except (rospy.ServiceException) as e:
-        print("Service call faild: %s"%e)
+        print ("Service call failed: %s%e")
         return
 
     rospy.loginfo("Got map=%dx%d resolution=%f", response.map.info.height,
@@ -63,8 +63,10 @@ def get_path(x, y, id):
         brushfire_map[mask] = 0
         # Flip image to get x->up, y->left (like top view in RVIZ looking towards x-axis)
         cv2.imwrite('brushfire.bmp', cv2.transpose(cv2.flip(brushfire_map, -1)))
-        # rospy.loginfo("Exported brushfire.bmp")
-    
+        rospy.loginfo("Exported brushfire.bmp")
+    else:
+        rospy.loginfo("brushfire failed! Is brusfire implemented?")
+
     # Example to show grid with same color than RVIZ
     grid[grid == -1] = 89
     grid[grid == 0] = 178
