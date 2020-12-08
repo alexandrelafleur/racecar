@@ -35,7 +35,7 @@ class slash_controller(object):
         # Memory
         
         # References Inputs
-        self.propulsion_ref  = 0
+        self.propulsion_ref = 0
         self.steering_ref    = 0
         self.high_level_mode = 0  # Control mode of this controller node
         
@@ -60,7 +60,7 @@ class slash_controller(object):
         # Computation of dy / dt with filtering
         self.laser_dy_fill = 0.9 * self.laser_dy_fill + 0.1 * (self.laser_y - self.laser_y_old) / self.dt
         self.laser_y_old   = self.laser_y        
-
+        # print("mode:", self.high_level_mode)
         if (self.high_level_mode < 0 ):
             # Full stop mode
             self.propulsion_cmd = 0  # Command sent to propulsion
@@ -135,6 +135,11 @@ class slash_controller(object):
                 self.steering_cmd   = u[1] + self.steering_offset
                 self.propulsion_cmd = u[0] 
                 self.arduino_mode   = 0 # TODO Mode ??? on arduino
+
+            elif ( self.high_level_mode == 7 ):
+                self.steering_cmd   = self.steering_ref + self.steering_offset
+                self.propulsion_cmd = self.propulsion_ref
+                self.arduino_mode   = 2 
         
         self.send_arduino()
 

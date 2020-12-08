@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 import numpy as np
 from sensor_msgs.msg import Joy
@@ -14,15 +14,20 @@ class teleop(object):
 
         self.sub_joy   = rospy.Subscriber("joy", Joy , self.joy_callback , queue_size=1)
         self.pub_cmd   = rospy.Publisher("ctl_ref", Twist , queue_size=1  ) 
-
+        self.chunky     = rospy.Subscriber("cmd_vel_abtr_2", Twist, self.chunky_callback, queue_size=1)
         self.max_vel  = rospy.get_param('~max_vel',   6.0) # Max linear velocity (m/s)
         self.max_volt = rospy.get_param('~max_volt',  8)   # Max voltage is set at 6 volts   
         self.maxStAng = rospy.get_param('~max_angle', 40)  # Supposing +/- 40 degrees max for the steering angle
         self.ps4 = rospy.get_param('~ps4', False)  # PlayStation4 controller: speed axis is 4
         self.cmd2rad   = self.maxStAng*2*3.1416/360
         self.joystickCompatibilityWarned = False
-
+        self.chunky_ref = 0
     ####################################### 
+    def chunky_callback(self, msg):
+        self.chunky_ref = msg.linear.x   
+        self.chunky_ref_angular = msg.angular.z
+        print("HEadsup")
+        print(self.chunky_ref, self.chunky_ref_angular)
         
     def joy_callback( self, joy_msg ):
         """ """
@@ -85,9 +90,12 @@ class teleop(object):
                 
             #If left trigger is active 
             elif (joy_msg.buttons[6]):
-
+                # Closed-loop velocity, Closed-loop steering
+                self.cmd_msg.linear.x  = self.chunky_ref #[m/s]
+                self.cmd_msg.angular.z = self.chunky_ref_angular # [m]
+                self.cmd_msg.linear.z  = 7  # Control mode
                 # Joystick disabled!
-                return;
+                return
                 
             #If right joy pushed
             elif(joy_msg.buttons[11]):

@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 
 import rospy
-import math 
+import math
+import subprocess 
 import numpy as np
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, CompressedImage
 from std_msgs.msg import String, Bool
 from nav_msgs.msg import Odometry
+from nav_msgs.srv import GetMap
+from labo_brushfire import get_path
+import cv2
+from libbehaviors import *
+from nav_msgs.srv import GetMap
+from libbehaviors import occupancy_grid_to_maze, brushfire
+from astar import pfind_new
 
 class State:
     FOLLOW_PATH = 0
@@ -17,7 +25,8 @@ class State:
     STOP = 5
 
 class Blob:
-    def __init__(self, x, y):
+    def __init__(self, x, y, id):
+        self.id = id
         self.abs_pos_x = x
         self.abs_pos_y = y
 
@@ -27,10 +36,13 @@ class PathFollowing:
         self.max_speed = rospy.get_param('~max_speed', 0.25)
         self.max_steering = rospy.get_param('~max_steering', 0.37)
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
+
         self.scan_sub = rospy.Subscriber('scan', LaserScan, self.scan_callback, queue_size=1)
         self.odom_sub = rospy.Subscriber('odom', Odometry, self.odom_callback, queue_size=1)
         self.obstacle_sub = rospy.Subscriber('obstacle_detected', Bool, self.obstacle_callback, queue_size=1)
         self.blob_sub = rospy.Subscriber('object_detected', Twist, self.blob_callback, queue_size=1)
+    
+        self.blob_sub = rospy.Subscriber('/racecar/raspicam_node/image/compressed', CompressedImage, self.image_callback, queue_size=1)
         self.state_timer = rospy.Timer( rospy.Duration( 0.05 ), self.state_machine_callback )
         
         # VARIABLES
@@ -49,51 +61,57 @@ class PathFollowing:
         self.L_obstacleDetected = False
         self.reached_the_end = False
         self.visited_blobs = []
+        self.picture_buffer = b''
 
     def scan_callback(self, msg):
         # Because the lidar is oriented backward on the racecar, 
         # if we want the middle value of the ranges to be forward:
-        l2 = len(msg.ranges)/2;
+        l2 = int(len(msg.ranges)/2)
         ranges = msg.ranges[l2:len(msg.ranges)] + msg.ranges[0:l2]
         
         # Obstacle front?   l2+l2/8
         self.R_obstacleDetected = False
         self.L_obstacleDetected = False
-        for i in range(3*l2/4 - l2/16, 3*l2/4 + l2/16) :
-            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
+        angle_offset = l2/8
+        start_angle = int(3*l2/4 - angle_offset)
+        stop_angle = int(3*l2/4 + angle_offset)
+        for i in range(start_angle, stop_angle) :
+            if (np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance):
                 self.R_obstacleDetected = True
                 break
-        for i in range(5*l2/4 - l2/16, 5*l2/4 + l2/16) :
-            if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
+        start_angle = int(5*l2/4 - angle_offset)
+        stop_angle = int(5*l2/4 + angle_offset)
+        for i in range(start_angle, stop_angle) :
+            if (np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance):
                 self.L_obstacleDetected = True
                 break
-
         self.state_machine_callback( None )
         
     def odom_callback(self, msg):
         self.pos_x = msg.pose.pose.position.x
         self.pos_y = msg.pose.pose.position.y
-        self.theta = msg.pose.pose.orientation.z
+        self.theta = msg.pose.pose.orientation.z*3.14
         # print("pos_x", self.pos_x)
-        if abs(self.pos_x - self.goal_pos_x) < self.delta_pos : # and abs(self.pos_y - self.goal_pos_y) < self.delta_pos)
+        if (abs(self.pos_x - self.goal_pos_x) < self.delta_pos) : # and abs(self.pos_y - self.goal_pos_y) < self.delta_pos)
             if self.state == State.FOLLOW_PATH:
                 if abs(self.theta) < 0.5:
                     print("DOING A 180")
                     self.state = State.DID_A_FULL_ONE_EIGHTY
                     self.reached_the_end = True
 
-        if abs(self.pos_x - self.start_pos_x) < self.delta_pos : # and abs(self.pos_y - self.goal_pos_y) < self.delta_pos)
+        if (abs(self.pos_x - self.start_pos_x) < self.delta_pos) : # and abs(self.pos_y - self.goal_pos_y) < self.delta_pos)
             if self.state == State.FOLLOW_PATH and self.reached_the_end:
                 print("REACHED THE START")
                 self.state = State.STOP
 
     def blob_callback(self, msg):
-        print("found object")
+        print("found from the callback object")
+        # Call labo_brushfire main()
 
         self.angle_blob = msg.angular.z
         self.distance_blob = msg.linear.x
 
-        if self.state == State.CENTER_ON_OBJECT and self.distance_blob < 2.0:
+        if (self.state == State.CENTER_ON_OBJECT and self.distance_blob < 2.0):
             self.state = State.WAIT_FOR_SCAN
             print('state: Waiting for scan')
 
@@ -109,20 +127,43 @@ class PathFollowing:
                     if abs(absolute_blob_pos_y - blob.abs_pos_y) < self.blob_delta_pos:
                         seenBefore = True
             if not seenBefore:
-                self.visited_blobs.append(Blob(absolute_blob_pos_x, absolute_blob_pos_y))
+                id = len(self.visited_blobs)        
+                blob = Blob(absolute_blob_pos_x, absolute_blob_pos_y, id)
+                print("Calling find_path()")
+                get_path(blob.abs_pos_x, blob.abs_pos_y, blob.id)
+                self.visited_blobs.append(blob)
+                blob_nb = len(self.visited_blobs)
+                #self.take_obstacle_picture(blob_nb)
+                self.state = State.CENTER_ON_OBJECT
 
-                if self.distance_blob < 2.5:
-                    self.state = State.CENTER_ON_OBJECT
-                    print('state: Trying to Center the object!')
-
+                print('state: Trying to Center the object!')        
 
     def obstacle_callback(self, msg):
         self.obstacle_detected = msg.data
         if self.obstacle_detected:
             print("Obstacle :", msg.data)
+            
+
+    def image_callback(self, msg):
+        self.picture_buffer = msg.data
+
+
+    def take_obstacle_picture(self, blob):
+        print("TAKING A PICTURE")
+        print("Putting da pictcha in da file")
+        file1 = open("/home/racecar/catkin_ws/data/photo_debris_" + str(blob.id) + ".png","w+b")
+        file1.write(self.picture_buffer)
+        file1.close()
+        # print("Putting it in da file")
+        file1 = open("/home/racecar/catkin_ws/data/Report.txt","a")
+        file1.write("debris_nb_" + str(blob.id) + "\n")
+        file1.write("X :" + str(blob.abs_pos_x) + " Y : " + str(blob.abs_pos_y) + "\n")
+        file1.write("photo_debris_" + str(blob.id) + "\n")
+        file1.write("trajectory_debris_" + str(blob.id) + "\n\n")
+        file1.close()
 
     def state_machine_callback(self, state_timer):
-        print("state:", self.state)
+        # print("state:", self.state)
         if self.state == State.CENTER_ON_OBJECT:
             self.mode_center_on_object()
 
@@ -141,15 +182,20 @@ class PathFollowing:
         elif self.state == State.STOP:
             self.mode_stop()
 
-        self.cmd_vel_pub.publish(self.twist)
+        # self.cmd_vel_pub.publish(self.twist)
 
     def mode_center_on_object(self):
         self.twist.linear.x = 0.2
         self.twist.angular.z = self.angle_blob
+        print("1")
+        self.cmd_vel_pub.publish(self.twist)
+
 
     def mode_wait_for_scan(self):
         self.twist.linear.x = 0
         self.twist.angular.z = 0
+        print("2")
+        self.cmd_vel_pub.publish(self.twist)
         rospy.sleep(5)
         self.state = State.FOLLOW_PATH
         # self.dont_look_for_objects_no_more = True
@@ -157,22 +203,32 @@ class PathFollowing:
     def mode_follow_path(self):
 
         if self.obstacle_detected:
-            print("Trying to back it up from the obstacle")
+            blob = Blob(3.2, 4.5, 5)
+            print("Back it up Terry!")
             self.twist.linear.x = -self.max_speed
             self.twist.angular.z = self.max_steering
+            print("3")
+            self.cmd_vel_pub.publish(self.twist)
 
         else:
             if(self.R_obstacleDetected and not self.L_obstacleDetected):
                 self.twist.angular.z = self.max_steering
+                print("4")
+                self.cmd_vel_pub.publish(self.twist)
             elif(self.L_obstacleDetected and not self.R_obstacleDetected):
                 self.twist.angular.z = -(self.max_steering)
+                print("5")
+                self.cmd_vel_pub.publish(self.twist)
             else:
                 self.twist.angular.z = 0
-            self.twist.linear.x = self.max_speed
+                self.twist.linear.x = self.max_speed
+                self.cmd_vel_pub.publish(self.twist)
 
     def mode_180_turn(self):
         self.twist.linear.x = self.max_speed
         self.twist.angular.z = self.max_steering
+        print("7")
+        self.cmd_vel_pub.publish(self.twist)
         if self.obstacle_detected:
             print("state: Rewinding")
             self.state = State.REWIND
@@ -180,6 +236,8 @@ class PathFollowing:
     def mode_rewind(self):
         self.twist.linear.x = -self.max_speed
         self.twist.angular.z = - 1/16 * self.max_steering
+        print("8")
+        self.cmd_vel_pub.publish(self.twist)
         if abs(self.theta) > 0.99:
             print("state: Follow Path")
             self.state = State.FOLLOW_PATH
@@ -187,6 +245,8 @@ class PathFollowing:
     def mode_stop(self):
         self.twist.linear.x = 0
         self.twist.angular.z = 0
+        print("9")
+        self.cmd_vel_pub.publish(self.twist)
 
 def main():
     rospy.init_node('path_following')

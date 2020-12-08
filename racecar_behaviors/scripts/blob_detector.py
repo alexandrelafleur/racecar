@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import rospy
-import cv2
 import numpy as np
+import cv2
 import message_filters
 import tf
 from racecar_behaviors.cfg import BlobDetectorConfig
@@ -20,22 +20,22 @@ class BlobDetector:
         self.map_frame_id = rospy.get_param('~map_frame_id', 'map')
         self.frame_id = rospy.get_param('~frame_id', 'base_link')
         self.object_frame_id = rospy.get_param('~object_frame_id', 'object')
-        self.color_hue = rospy.get_param('~color_hue', 120) # 160=purple, 100=blue, 10=Orange
-        self.color_range = rospy.get_param('~color_range', 30) 
+        self.color_hue = rospy.get_param('~color_hue', 100) # 160=purple, 100=blue, 10=Orange
+        self.color_range = rospy.get_param('~color_range', 25) 
         self.color_saturation = rospy.get_param('~color_saturation', 50) 
-        self.color_value = rospy.get_param('~color_value', 50) 
-        self.border = rospy.get_param('~border', 10) 
-        #self.config_srv = Server(BlobDetectorConfig, self.config_callback)
+        self.color_value = rospy.get_param('~color_value', 0) 
+        self.border = rospy.get_param('~border', 15) 
+        # self.config_srv = Server(BlobDetectorConfig, self.config_callback)
         
         params = cv2.SimpleBlobDetector_Params()
         # see https://www.geeksforgeeks.org/find-circles-and-ellipses-in-an-image-using-opencv-python/
         #     https://docs.opencv.org/3.4/d0/d7a/classcv_1_1SimpleBlobDetector.html
         
-        params.thresholdStep = 10;
-        params.minThreshold = 50;
-        params.maxThreshold = 220;
-        params.minRepeatability = 2;
-        params.minDistBetweenBlobs = 10;
+        params.thresholdStep = 10
+        params.minThreshold = 50
+        params.maxThreshold = 220
+        params.minRepeatability = 2
+        params.minDistBetweenBlobs = 10
         
         # Set Color filtering parameters 
         params.filterByColor = False
@@ -138,7 +138,7 @@ class BlobDetector:
 
         # We process only the closest object detected
         if closestObject[2] > 0:
-            # print("FOND the oject")
+            print("FOUND the oject")
             # assuming the object is circular, use center of the object as position
             transObj = (closestObject[0], closestObject[1], closestObject[2])
             rotObj = tf.transformations.quaternion_from_euler(0, np.pi/2, -np.pi/2)
@@ -174,8 +174,8 @@ class BlobDetector:
             msg.angular.z = angle
             self.object_pub.publish(msg) # signal that an object has been detected
             #rospy.loginfo("Object detected at [%f,%f] in %s frame! Distance and direction from robot: %fm %fdeg.", transMap[0], transMap[1], self.map_frame_id, distance, angle*180.0/np.pi)
-        # else:
-            # print("didnot found th eobject")
+        else:
+            print("did not found the object")
         #     rospy.loginfo("Object not detected")
         #     print("Object not detected")
         #     msg = String()
