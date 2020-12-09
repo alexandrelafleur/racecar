@@ -22,6 +22,7 @@ class teleop(object):
         self.cmd2rad   = self.maxStAng*2*3.1416/360
         self.joystickCompatibilityWarned = False
         self.chunky_ref = 0
+        self.chunky_ref_angular = 0
     ####################################### 
     def chunky_callback(self, msg):
         self.chunky_ref = msg.linear.x   

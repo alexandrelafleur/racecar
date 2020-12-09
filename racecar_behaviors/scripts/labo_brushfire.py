@@ -90,7 +90,7 @@ def get_path(x, y, id):
             if i != 0 and i!=len(path)-1:
                 maze[step[0]][step[1]] = 255
 
-    cv2.imwrite('/home/racecar/catkin_ws/data/maze.bmp', cv2.transpose(cv2.flip(maze, -1)))
+    cv2.imwrite('/home/racecar/catkin_ws/data/trajectory_debris_' + str(id) + '.bmp', cv2.transpose(cv2.flip(maze, -1)))
     rospy.loginfo("Exported maze.bmp")
 
 

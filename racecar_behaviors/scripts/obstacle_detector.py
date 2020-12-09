@@ -26,8 +26,8 @@ class ObstacleDetector:
         
         # # Obstacle front?
         obstacleDetected = False
-        start_angle = int(l2-l2/8)
-        stop_angle = int(l2+l2/8)
+        start_angle = int(l2-l2/16)
+        stop_angle = int(l2+l2/16)
         for i in range(start_angle, stop_angle) :
             if np.isfinite(ranges[i]) and ranges[i]>0 and ranges[i] < self.distance:
                 obstacleDetected = True
