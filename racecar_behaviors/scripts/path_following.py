@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import rospy
 import math
@@ -238,7 +238,7 @@ class PathFollowing:
 
     def mode_180_turn(self):
         self.twist.linear.x = self.max_speed
-        self.twist.angular.z = self.max_steering
+        self.twist.angular.z = -self.max_steering
         print("7")
         if self.obstacle_detected:
             print("state: Rewinding")

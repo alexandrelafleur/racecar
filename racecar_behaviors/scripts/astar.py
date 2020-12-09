@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 from heapq import heappush, heappop
 from math import hypot, sqrt

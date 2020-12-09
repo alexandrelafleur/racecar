@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import rospy
 import numpy as np
@@ -20,11 +20,11 @@ class BlobDetector:
         self.map_frame_id = rospy.get_param('~map_frame_id', 'map')
         self.frame_id = rospy.get_param('~frame_id', 'base_link')
         self.object_frame_id = rospy.get_param('~object_frame_id', 'object')
-        self.color_hue = rospy.get_param('~color_hue', 100) # 160=purple, 100=blue, 10=Orange
-        self.color_range = rospy.get_param('~color_range', 10) 
+        self.color_hue = rospy.get_param('~color_hue', 120) # 160=purple, 100=blue, 10=Orange
+        self.color_range = rospy.get_param('~color_range', 30) 
         self.color_saturation = rospy.get_param('~color_saturation', 50) 
         self.color_value = rospy.get_param('~color_value', 50) 
-        self.border = rospy.get_param('~border', 15) 
+        self.border = rospy.get_param('~border', 10) 
         # self.config_srv = Server(BlobDetectorConfig, self.config_callback)
         
         params = cv2.SimpleBlobDetector_Params()
